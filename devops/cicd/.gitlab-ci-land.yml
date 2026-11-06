@@ -1,0 +1,92 @@
+variables:
+  ANSIBLE_CONFIG: ./devops/ansible/ansible.cfg
+  ANSIBLE_FORCE_COLOR: 'true'
+
+stages:
+  - build_image
+  - deploy_argocd
+  - deploy_prod
+
+build-image:
+  image: 
+    name: docker-registry.example.com/library/docker:26.0.0-dind # -dind или -cli Понять в чем разница и что лучше использовать
+#  stage: build
+  stage: build_image
+  tags:
+    - docker
+  script:
+    - GIT_REPO_NAME=$(echo $CI_PROJECT_DIR | sed 's/.*\///')
+    - echo $GIT_REPO_NAME
+    - docker login -u "$NEXUS_USERNAME" -p "$NEXUS_PASSWORD" https://docker-registry.example.com
+    - docker build -t docker-registry.example.com/company-land/$GIT_REPO_NAME:$CI_COMMIT_BRANCH-v0.1 -t docker-registry.example.com/company-land/$GIT_REPO_NAME:$CI_COMMIT_BRANCH-$CI_COMMIT_SHORT_SHA .
+    - docker push docker-registry.example.com/company-land/$GIT_REPO_NAME:$CI_COMMIT_BRANCH-v0.1
+    - docker push docker-registry.example.com/company-land/$GIT_REPO_NAME:$CI_COMMIT_BRANCH-$CI_COMMIT_SHORT_SHA
+#    - docker system prune -af
+  only:
+    refs:
+      - develop
+      - test
+      - master
+
+bump_argocd_dev:
+  stage: deploy_argocd
+  image:
+    name: docker-registry.example.com/library/ansible:p3.12.13-bookworm-v2 # Переделать браз, 600мб слишком дофига
+  tags:
+    - docker
+  needs: ["build-image"]
+  script:
+    - git clone https://$ARCOCD_PUSH_TOKEN_NAME:$ARCOCD_PUSH_TOKEN@gitlab.example.com/company/argo-cd.git
+    - cd argo-cd
+    - git checkout develop
+    - VALUES_FILE="company-helm-chart/values/company-dev/landing/values.yaml"
+    - |
+      if [ ! -f "$VALUES_FILE" ]; then
+        echo "ERROR: $VALUES_FILE not found in argo-cd repo"
+        ls company-helm-chart/values/company-dev/
+        exit 1
+      fi
+    - 'NEW_TAG="develop-$CI_COMMIT_SHORT_SHA" && sed -i "s#^  tag:.*#  tag: $NEW_TAG#" "$VALUES_FILE"'
+    - echo "=== Updated $VALUES_FILE ==="
+    - head -12 "$VALUES_FILE"
+    - git config user.email "test@example.com"
+    - git config user.name "Argocd"
+    - git add "$VALUES_FILE"
+    - |
+      if git diff --cached --quiet; then
+        echo "No changes (tag already up-to-date)"
+      else
+        git commit -m "ci: bump landing to develop-$CI_COMMIT_SHORT_SHA"
+        git push origin develop
+      fi
+  only:
+    refs:
+      - develop
+
+deploy_prod:
+  stage: deploy_prod
+  image:
+    name: willhallonline/ansible:2.18-alpine-3.18
+  tags:
+    - docker
+  before_script:
+    # Восстановление приватного ключа
+    - mkdir -p /root/.ssh
+    - cp "$SSH_PROD" /root/.ssh/id_rsa
+    - chmod 600 /root/.ssh/id_rsa
+#    - sed -i 's/\r$//' /root/.ssh/id_rsa
+    - ls -l /root/.ssh/id_rsa
+    - head -n 2 /root/.ssh/id_rsa
+#    - ssh-keygen -l -f /root/.ssh/id_ed25519
+
+    # (опционально) Установка SSH config вручную 1
+    - echo -e "Host *\n  StrictHostKeyChecking no\n" > /root/.ssh/config
+    - chmod 600 /root/.ssh/config    
+  script:
+    - git clone https://$DEVOPS_TOKEN_NAME:$DEVOPS_TOKEN@gitlab.example.com/company/devops.git
+    - ansible-playbook --inventory ./devops/ansible/inventory/hosts.yml ./devops/ansible/main-land.yml --limit company-land-1
+  only:
+    refs:
+      - master
+  when: manual
+

@@ -1,0 +1,19 @@
+{{- if .Values.texliveFontconfig.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: texlive-fontconfig
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+data:
+  09-texlive.conf: |
+    <?xml version="1.0"?>
+    <!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+    <fontconfig>
+      <dir>/usr/local/texlive/2024/texmf-dist/fonts/opentype</dir>
+      <dir>/usr/local/texlive/2024/texmf-dist/fonts/truetype</dir>
+      <dir>/usr/local/texlive/2025/texmf-dist/fonts/opentype</dir>
+      <dir>/usr/local/texlive/2025/texmf-dist/fonts/truetype</dir>
+    </fontconfig>
+{{- end }}

@@ -1,0 +1,39 @@
+maintenance:
+  enabled: false # Включение заглушки техработ - также включить в values ingress-route
+
+skipDefaultResources: true
+
+externalServices:
+  - name: company-land
+    host: 10.10.20.10
+    port: 8090
+
+ingressRouteWeb:
+  enabled: true
+  name: company-prod-web
+  middlewareName: https-redirect
+  routes:
+    - kind: Rule
+      match: Host(`example.com`) || Host(`example.com`) || Host(`www.example.com`) || Host(`www.example.com`) || Host(`app.example.com`) || Host(`app.example.com`)
+      services:
+        - name: frontend-application
+          port: 80
+
+ingressRoute:
+  enabled: true
+  name: company-prod-route
+  entryPoints:
+    - websecure
+  tls:
+    secretName: prod-web-cert
+  routes:
+    - kind: Rule
+      match: Host(`example.com`) || Host(`example.com`) || Host(`www.example.com`) || Host(`www.example.com`)
+      services:
+        - name: company-land
+          port: 8090
+    - kind: Rule
+      match: Host(`app.example.com`) || Host(`app.example.com`)
+      services:
+        - name: frontend-application
+          port: 80

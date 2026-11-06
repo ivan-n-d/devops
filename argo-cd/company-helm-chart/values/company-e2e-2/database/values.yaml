@@ -1,0 +1,29 @@
+skipDefaultResources: true
+
+externalDatabase:
+  enabled: true
+  host: postgres-01.internal.example
+  serviceName: database-postgres
+
+postgresql:
+  enabled: false
+  image: postgres:15.4
+  user: postgres
+  sealedSecret: |
+    ---
+    apiVersion: bitnami.com/v1alpha1
+    kind: SealedSecret
+    metadata:
+      name: database-postgres-secret
+      namespace: company-e2e-2
+    spec:
+      encryptedData:
+        POSTGRES_DB: REPLACE_WITH_KUBESEAL
+        POSTGRES_PASSWORD: REPLACE_WITH_KUBESEAL
+        POSTGRES_USER: REPLACE_WITH_KUBESEAL
+      template:
+        metadata:
+          name: database-postgres-secret
+          namespace: company-e2e-2
+  database: postgres
+  storageSize: 10Gi

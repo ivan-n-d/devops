@@ -1,0 +1,8 @@
+stages:
+  - build_image
+  - deploy_argocd
+
+include:
+  - project: "company/devops"
+    ref: master
+    file: "/cicd/.gitlab-ci-deploy-with-arg.yml"

@@ -1,0 +1,12 @@
+stages:
+  - build_image
+  - deploy_dev
+  - deploy_master
+  - deploy_test
+  - deploy_texlive
+  - deploy_argocd
+
+include:
+  - project: "company/devops"
+    ref: master
+    file: "/cicd/.gitlab-ci-deploy.yml"

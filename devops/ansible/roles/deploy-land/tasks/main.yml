@@ -1,0 +1,8 @@
+---
+- name: pull.
+  shell:
+    "docker compose -f /srv/company/land-company/docker-compose.yaml pull company-land"
+
+- name: up.
+  shell:
+    "docker compose -f /srv/company/land-company/docker-compose.yaml up -d"

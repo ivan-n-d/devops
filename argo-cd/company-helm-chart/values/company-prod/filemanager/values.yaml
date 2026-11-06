@@ -1,0 +1,64 @@
+replicaCount: 1
+imagePullPolicy: Always
+image:
+  repository: docker-registry.example.com/company/filemanager
+  tag: master-461a6179
+  pullPolicy: IfNotPresent
+  name: filemanager
+containerPort: 8080
+service:
+  enabled: true
+  port: 8080
+env:
+  ASPNETCORE_ENVIRONMENT: "Development"
+  MINIO__PROTOCOL: "http"
+  MINIO__ADDRESS: "10.10.20.10:9000"
+  FILE__MAX_SIZE: "105000000"
+  FILE__TIME_EXPIRATION_URI_MILLISECONDS: "600000"
+  FILE__TIME_EXPIRATION_MILLISECONDS: "600000"
+
+secretEnv:
+  MINIO__ACCESS_KEY: ""
+  MINIO__SECRET_KEY: ""
+
+sealedSecrets:
+  - apiVersion: bitnami.com/v1alpha1
+    kind: SealedSecret
+    metadata:
+      name: filemanager-secret
+      namespace: company-prod
+    spec:
+      encryptedData:
+        MINIO__ACCESS_KEY: REPLACE_WITH_KUBESEAL
+        MINIO__SECRET_KEY: REPLACE_WITH_KUBESEAL
+      template:
+        metadata:
+          name: filemanager-secret
+          namespace: company-prod
+
+resources:
+  requests:
+    cpu: "200m"
+    memory: "320Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1024Mi"
+readinessProbe:
+  tcpSocket:
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+livenessProbe:
+  tcpSocket:
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 30
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app: filemanager

@@ -1,0 +1,9 @@
+cache/
+temp/
+config
+get_helm.sh
+*.tgz
+charts/
+.idea/
+.vscode/
+*.swp

@@ -1,0 +1,75 @@
+skipDefaultResources: true
+
+developerRBAC:
+  enabled: true
+
+namespacePolicy:
+  enabled: true
+  quota:
+    requests:
+      cpu: "8"
+      memory: 12Gi
+    limits:
+      cpu: "17"
+      memory: 24Gi      #главный предохранитель от OOM-kill
+    pods: "40"          #11 сервисов x 3 реплики + запас
+    persistentvolumeclaims: "2"
+
+  limitRange:
+    enabled: true
+    default:              #limits, если не заданы в поде
+      cpu: 500m
+      memory: 512Mi
+    defaultRequest:       #requests, если не заданы
+      cpu: 50m
+      memory: 64Mi
+    max:                  #потолок на один контейнер
+      cpu: "4"
+      memory: 6Gi
+
+networkPolicy:
+  enabled: true                  # разрешающие политики включены
+
+  allowDns: true            
+  allowNamespaceInternal: true    
+  allowTraefikIngress: true       
+  nodeCidr: 10.10.10.0/24
+
+  allowExternal:
+    - cidr: 10.10.10.45/32       # postgres-01
+      ports: [5433, 5436, 6433, 6436]   # 5433/5436 оставлены для дебага.
+    - cidr: 10.10.10.40/32       # minio-01
+      ports: [9000]
+    - cidr: 203.0.113.20/32       # smtp.example.com
+      ports: [465]
+    - cidr: 198.51.100.10/32     # mail-01.example.com (публичный IP)
+      ports: [465]
+    - cidr: 10.10.10.50/32       # mail-01 (внутренний IP — k8s-поды резолвят через внутренний DNS)
+      ports: [465]
+    - cidr: 104.18.20.0/23        # crl/ocsp/secure.globalsign.com
+      ports: [80]
+    - cidr: 8.47.69.0/32          # lencr.org CRL (Let's Encrypt)
+      ports: [80]
+    - cidr: 8.6.112.0/32          # lencr.org CRL (Let's Encrypt)
+      ports: [80]
+    - cidr: 2.16.0.0/13           # Akamai CDN (lencr.org CRL, любые эджи)
+      ports: [80]
+    - cidr: 23.0.0.0/12           # Akamai CDN (lencr.org CRL, любые эджи)
+      ports: [80]
+    - cidr: 80.239.150.0/24       # Akamai edge (Telia POP)
+      ports: [80]
+      ports: [80]
+    - cidr: 146.75.0.0/16         # crl.globalsign.com GeoDNS
+      ports: [80]
+    - cidr: 192.0.80.242/31       # gravatar.com
+      ports: [80, 443]
+    - cidr: 10.10.10.107/32        # k8s-master01
+    - cidr: 10.10.10.108/32        # k8s-worker01
+    - cidr: 10.10.10.109/32        # k8s-worker02
+    - cidr: 10.10.10.111/32        # k8s-worker03
+    - cidr: 10.10.10.114/32        # k8s-worker-test
+
+  # Аварийный клапан: разрешить весь egress наружу
+  allowExternalAll: false
+
+  defaultDenyEgress: true         # запрещаем egress к другим стендам

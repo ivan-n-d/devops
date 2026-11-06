@@ -1,0 +1,11 @@
+{{- if not .Values.skipDefaultResources }}
+{{- if .Values.useAppsettings }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-appsettings
+data:
+  appsettings.json: |
+{{ .Files.Get (printf "conf/%s/%s/appsettings.json" .Values.environment .Values.serviceName) | indent 4 }}
+{{- end }}
+{{- end }}

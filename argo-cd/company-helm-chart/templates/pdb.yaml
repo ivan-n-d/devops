@@ -1,0 +1,29 @@
+{{/*
+PodDisruptionBudget
+*/}}
+{{- if and .Values.podDisruptionBudget .Values.podDisruptionBudget.enabled }}
+{{- $rc := .Values.replicaCount | default 1 | int }}
+{{- if lt $rc 2 }}
+{{- fail (printf "podDisruptionBudget.enabled=true требует replicaCount >= 2 (сейчас %d). При одной реплике PDB заблокирует kubectl drain навсегда. См. kubernetes/namespace-spreading-plan.md, Блокер В." $rc) }}
+{{- end }}
+{{- $pdb := .Values.podDisruptionBudget }}
+{{- if and $pdb.minAvailable $pdb.maxUnavailable }}
+{{- fail "podDisruptionBudget: задайте ЛИБО minAvailable, ЛИБО maxUnavailable, но не оба одновременно." }}
+{{- end }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: helm
+spec:
+  {{- if $pdb.minAvailable }}
+  minAvailable: {{ $pdb.minAvailable }}
+  {{- else }}
+  maxUnavailable: {{ $pdb.maxUnavailable | default 1 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+{{- end }}

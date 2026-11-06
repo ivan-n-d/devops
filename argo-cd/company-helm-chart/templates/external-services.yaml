@@ -1,0 +1,29 @@
+{{/*
+ExternalName сервисы.
+Включение в values/<env>/ingress-route/values.yaml:
+
+    externalServices:
+      - name: company-land
+        host: 10.10.20.10
+        port: 8090
+*/}}
+{{- range .Values.externalServices }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .name }}
+  labels:
+    app.kubernetes.io/name: {{ .name }}
+    app.kubernetes.io/component: external-service
+    app.kubernetes.io/managed-by: helm
+  annotations:
+    example.com/description: "ExternalName на {{ .host }}:{{ .port }} (вне кластера)"
+spec:
+  type: ExternalName
+  externalName: {{ .host }}
+  ports:
+    - name: http
+      port: {{ .port }}
+      targetPort: {{ .port }}
+{{- end }}

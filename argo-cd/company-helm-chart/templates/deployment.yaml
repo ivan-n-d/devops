@@ -1,0 +1,141 @@
+{{- if not .Values.skipDefaultResources }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  template:
+    metadata:
+      annotations:
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        version: {{ .Values.deploymentVersion | default "" | quote }}
+        {{- if .Values.useNginxConfig }}
+        checksum/nginx-config: {{ include (print $.Template.BasePath "/configmap-nginx.yaml") . | sha256sum }}
+        {{- end }}
+      labels:
+        app: {{ .Release.Name }}
+    spec:
+      containers:
+      - name: {{ .Values.image.name }}
+        imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"  
+        {{- if .Values.containerSecurityContext }}
+        securityContext:
+          {{- toYaml .Values.containerSecurityContext | nindent 10 }}
+        {{- end }}
+        ports:
+        - containerPort: {{ .Values.containerPort }}
+        {{- if or .Values.env .Values.secretEnv }}
+        env:
+          {{- range $key, $value := .Values.env }}
+          - name: {{ $key }}
+            value: {{ $value | quote }}
+          {{- end }}
+          {{- range $key, $value := .Values.secretEnv }}
+          - name: {{ $key }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ $.Release.Name }}-secret
+                key: {{ $key }}
+          {{- end }}
+        {{- end }}
+        {{- if .Values.resources }}
+        resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+        {{- end }}
+        volumeMounts:
+        {{- if .Values.useAppsettings }}
+        - name: appsettings
+          mountPath: /app/appsettings.json
+          subPath: appsettings.json
+          readOnly: true
+        {{- end }}
+        {{- if and .Values.useNginxConfig .Values.maintenance .Values.maintenance.enabled }}
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d/default.conf
+          subPath: maintenance.conf
+          readOnly: true
+        - name: nginx-config
+          mountPath: /usr/share/nginx/html/maintenance.html
+          subPath: maintenance.html
+          readOnly: true
+        {{- else if .Values.useNginxConfig }}
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d/default.conf
+          subPath: default.conf
+          readOnly: true
+        {{- end }}
+        {{- if .Values.useNginxMainConfig }}
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+          readOnly: true
+        {{- end }}
+        {{- if .Values.texlive.enabled }}
+        - name: texlive
+          mountPath: {{ .Values.texlive.mountPath }}
+          readOnly: {{ .Values.texlive.readOnly }}
+        {{- end }}
+        {{- if .Values.texliveFontconfig.enabled }}
+        - name: texlive-fontconfig
+          mountPath: /etc/fonts/conf.d/09-texlive.conf
+          subPath: 09-texlive.conf
+          readOnly: true
+        {{- end }}
+        {{- if .Values.readinessProbe }}
+        readinessProbe:
+          {{- toYaml .Values.readinessProbe | nindent 10 }}
+        {{- end }}
+        {{- if .Values.livenessProbe }}
+        livenessProbe:
+          {{- toYaml .Values.livenessProbe | nindent 10 }}
+        {{- end }}
+      volumes:
+      {{- if .Values.useAppsettings }}
+      - name: appsettings
+        configMap:
+          name: {{ .Release.Name }}-appsettings
+      {{- end }}
+      {{- if .Values.useNginxConfig }}
+      - name: nginx-config
+        configMap:
+          name: {{ .Release.Name }}-nginx-config
+      {{- end }}
+      {{- if .Values.texlive.enabled }}
+      - name: texlive
+        hostPath:
+          path: {{ .Values.texlive.hostPath }}
+          type: Directory
+      {{- end }}
+      {{- if .Values.texliveFontconfig.enabled }}
+      - name: texlive-fontconfig
+        configMap:
+          name: texlive-fontconfig
+      {{- end }}
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{/*
+        Разнос реплик по нодам. Использовать whenUnsatisfiable: ScheduleAnyway —
+        при DoNotSchedule и replicas - числа нод лишние поды навсегда останутся Pending.
+      */}}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

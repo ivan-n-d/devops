@@ -1,0 +1,124 @@
+{{/*
+NetworkPolicy для изоляции стендов.
+*/}}
+{{- if and .Values.networkPolicy .Values.networkPolicy.enabled }}
+{{- $np := .Values.networkPolicy }}
+{{- $ns := .Release.Namespace }}
+
+{{- if $np.allowDns | default true }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  annotations:
+    example.com/description: "Резолв имён через CoreDNS."
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+{{- end }}
+
+{{- if $np.allowNamespaceInternal | default true }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-same-namespace
+  annotations:
+    example.com/description: "Сервисы стенда общаются между собой"
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: {}
+  egress:
+    - to:
+        - podSelector: {}
+{{- end }}
+
+{{- if $np.allowTraefikIngress | default true }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-traefik-ingress
+  annotations:
+    example.com/description: "Внешний HTTP-трафик от Traefik."
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: traefik
+        - ipBlock:
+            cidr: {{ $np.nodeCidr | default "10.10.10.0/24" }}
+{{- end }}
+
+{{- with $np.allowExternal }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-external-services
+  annotations:
+    example.com/description: "Egress к внешним PostgreSQL / MinIO / SMTP."
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    {{- range . }}
+    - to:
+        - ipBlock:
+            cidr: {{ .cidr }}
+      {{- with .ports }}
+      ports:
+        {{- range . }}
+        - { protocol: TCP, port: {{ . }} }
+        {{- end }}
+      {{- end }}
+    {{- end }}
+{{- end }}
+
+{{- if $np.allowExternalAll }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-internet
+  annotations:
+    example.com/description: "весь egress наружу кластера. Использовать временно при отладке."
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - {{ $np.podCidr | default "10.244.0.0/16" }}
+{{- end }}
+
+{{- if $np.defaultDenyEgress }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-cross-namespace-egress
+  annotations:
+    example.com/description: "Запрет egress к другим стендам. Включать последним. Откат: networkPolicy.defaultDenyEgress=false"
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress: []
+{{- end }}
+{{- end }}

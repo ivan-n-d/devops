@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vector-logging-config
+  namespace: kube-system
+data:
+  vector.yaml: |
+    api:
+      enabled: false
+
+    sources:
+      k8s_logs:
+        type: kubernetes_logs
+        # Автоматически читает /var/log/pods/ через kubelet API
+        # Enrich метаданными: pod name, namespace, labels, annotations
+
+      host_journald:
+        type: journald
+        # Диагностика: читаем ВСЁ, фильтрацию юнитов делаем в remap (после проверки имён полей)
+
+    transforms:
+      parse_json:
+        type: remap
+        inputs: [k8s_logs]
+        source: |
+          # Переименуем ключевые поля: убираем точки
+          .pod_namespace = .kubernetes.pod_namespace
+          .pod_name = .kubernetes.pod_name
+          .container_name = .kubernetes.container_name
+          .node_name = .kubernetes.pod_node_name
+
+          # .NET пишет логи в JSON — парсим
+          parsed = parse_json(.message) ?? null
+          if parsed != null {
+            . = merge!(., parsed)
+          }
+
+      journald_tags:
+        type: remap
+        inputs: [host_journald]
+        source: |
+          u = to_string(._SYSTEMD_UNIT) ?? ""
+          ident = to_string(.SYSLOG_IDENTIFIER) ?? ""
+          allowed_units = ["ssh.service", "sshd.service", "sudo.service", "systemd-logind.service", "kubelet.service", "containerd.service"]
+          allowed_idents = ["sshd", "sudo", "kubelet", "containerd", "systemd-logind"]
+          if !includes(allowed_units, u) && !includes(allowed_idents, ident) { abort }
+          .unit = if u != "" { u } else { ident }
+          .source_type = "journald"
+          .node_name = get_env_var!("VECTOR_SELF_NODE_NAME")
+
+    sinks:
+      victoria_logs:
+        type: elasticsearch
+        inputs: [parse_json]
+        endpoints:
+          - "http://10.10.10.17:9428/insert/elasticsearch/"
+        mode: bulk
+        api_version: v8
+        compression: gzip
+        healthcheck:
+          enabled: false
+        request:
+          headers:
+            # Stream fields — группировка логов в victoria-logs
+            VL-Stream-Fields: "pod_namespace,pod_name,container_name"
+            VL-Time-Field: "timestamp"
+            VL-Msg-Field: "message,log"
+            AccountID: "0"
+            ProjectID: "0"
+
+      victoria_logs_journald:
+        type: elasticsearch
+        inputs: [journald_tags]
+        endpoints:
+          - "http://10.10.10.17:9428/insert/elasticsearch/"
+        mode: bulk
+        api_version: v8
+        compression: gzip
+        healthcheck:
+          enabled: false
+        request:
+          headers:
+            VL-Stream-Fields: "source_type,node_name,unit"
+            VL-Time-Field: "timestamp"
+            VL-Msg-Field: "message"
+            AccountID: "0"
+            ProjectID: "0"

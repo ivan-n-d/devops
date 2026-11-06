@@ -1,0 +1,6 @@
+env:
+  ASPNETCORE_ENVIRONMENT: "Development"
+  PG__HOST: "database-postgres"
+  PG__PORT: "6441"   # PgBouncer
+  PG__DATABASE: "e2e2_projects"
+  PG__USERNAME: "e2e2_projects"

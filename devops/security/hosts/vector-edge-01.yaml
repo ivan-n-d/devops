@@ -1,0 +1,75 @@
+api:
+  enabled: false
+
+sources:
+  host_journald:
+    type: journald
+    # host: ssh/sudo/logind
+
+  docker_logs:
+    type: docker_logs
+    # все контейнеры edge-01
+
+transforms:
+  journald_tags:
+    type: remap
+    inputs: [host_journald]
+    source: |
+      u = to_string(._SYSTEMD_UNIT) ?? ""
+      ident = to_string(.SYSLOG_IDENTIFIER) ?? ""
+      allowed_units = ["ssh.service", "sshd.service", "sudo.service", "systemd-logind.service", "containerd.service"]
+      allowed_idents = ["sshd", "sudo", "systemd-logind"]
+      if !includes(allowed_units, u) && !includes(allowed_idents, ident) { abort }
+      .unit = if u != "" { u } else { ident }
+      .source_type = "journald"
+      .node_name = "edge-01"
+
+  docker_tags:
+    type: remap
+    inputs: [docker_logs]
+    source: |
+      .source_type = "docker_logs"
+      .node_name = "edge-01"
+      .container_name = to_string(.container_name) ?? replace(to_string(.image) ?? "unknown", ":", "_")
+      # traefik access-log (json) парсим в поля: ClientHost, DownstreamStatus, RequestPath, RouterName...
+      parsed = parse_json(.message) ?? null
+      if parsed != null {
+        . = merge!(., parsed)
+      }
+
+sinks:
+  victoria_logs_journald:
+    type: elasticsearch
+    inputs: [journald_tags]
+    endpoints:
+      - "http://10.10.10.17:9428/insert/elasticsearch/"
+    mode: bulk
+    api_version: v8
+    compression: gzip
+    healthcheck:
+      enabled: false
+    request:
+      headers:
+        VL-Stream-Fields: "source_type,node_name,unit"
+        VL-Time-Field: "timestamp"
+        VL-Msg-Field: "message"
+        AccountID: "0"
+        ProjectID: "0"
+
+  victoria_logs_docker:
+    type: elasticsearch
+    inputs: [docker_tags]
+    endpoints:
+      - "http://10.10.10.17:9428/insert/elasticsearch/"
+    mode: bulk
+    api_version: v8
+    compression: gzip
+    healthcheck:
+      enabled: false
+    request:
+      headers:
+        VL-Stream-Fields: "source_type,node_name,container_name"
+        VL-Time-Field: "timestamp"
+        VL-Msg-Field: "message"
+        AccountID: "0"
+        ProjectID: "0"

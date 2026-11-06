@@ -1,0 +1,86 @@
+api:
+  enabled: false
+
+sources:
+  host_journald:
+    type: journald
+
+  docker_files:
+    type: file
+    include:
+      - /var/lib/docker/containers/*/*-json.log
+    read_from: end
+    glob_minimum_cooldown_ms: 2000
+
+transforms:
+  journald_tags:
+    type: remap
+    inputs: [host_journald]
+    source: |
+      u = to_string(._SYSTEMD_UNIT) ?? ""
+      ident = to_string(.SYSLOG_IDENTIFIER) ?? ""
+      allowed_units = ["ssh.service", "sshd.service", "sudo.service", "systemd-logind.service"]
+      allowed_idents = ["sshd", "sudo", "systemd-logind"]
+      if !includes(allowed_units, u) && !includes(allowed_idents, ident) { abort }
+      .unit = if u != "" { u } else { ident }
+      .source_type = "journald"
+      .node_name = "vpn-01"
+
+  docker_tags:
+    type: remap
+    inputs: [docker_files]
+    source: |
+      .source_type = "docker_logs"
+      .node_name = "vpn-01"
+      parts = split(to_string(.file) ?? "", "/")
+      cid = to_string(parts[5])
+      cid = slice(cid, 0, 12) ?? cid
+      # карта соответствия ID и имён контейнеров: обновить при пересоздании контейнеров vpn-gw (docker-compose up)
+      names = {"a1b2c3d4e5f6": "vpn-postgres-1", "b2c3d4e5f6a1": "vpn-caddy-1", "c3d4e5f6a1b2": "vpn-app-1"}
+      n = get(names, [cid]) ?? null
+      .container_name = if n != null { n } else { cid }
+      parsed = parse_json(.message) ?? null
+      if parsed != null {
+        .message = to_string(parsed.log) ?? .message
+        ts = to_string(parsed.time) ?? ""
+        if ts != "" {
+          .timestamp = parse_timestamp(ts, format: "%+") ?? now()
+        }
+      }
+
+sinks:
+  victoria_logs_journald:
+    type: elasticsearch
+    inputs: [journald_tags]
+    endpoints:
+      - "http://10.10.10.17:9428/insert/elasticsearch/"
+    mode: bulk
+    api_version: v8
+    compression: gzip
+    healthcheck:
+      enabled: false
+    request:
+      headers:
+        VL-Stream-Fields: "source_type,node_name,unit"
+        VL-Time-Field: "timestamp"
+        VL-Msg-Field: "message"
+        AccountID: "0"
+        ProjectID: "0"
+
+  victoria_logs_docker:
+    type: elasticsearch
+    inputs: [docker_tags]
+    endpoints:
+      - "http://10.10.10.17:9428/insert/elasticsearch/"
+    mode: bulk
+    api_version: v8
+    compression: gzip
+    healthcheck:
+      enabled: false
+    request:
+      headers:
+        VL-Stream-Fields: "source_type,node_name,container_name"
+        VL-Time-Field: "timestamp"
+        VL-Msg-Field: "message"
+        AccountID: "0"
+        ProjectID: "0"

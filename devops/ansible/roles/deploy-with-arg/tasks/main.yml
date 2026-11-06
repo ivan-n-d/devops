@@ -1,0 +1,55 @@
+---
+- name: Fail if branch not in inventory groups
+  ansible.builtin.fail:
+    msg: "Branch '{{ commit_branch }}' has no group in inventory"
+  when: commit_branch not in groups
+
+- name: Set stand address from inventory
+  ansible.builtin.set_fact:
+    stand_address: "{{ hostvars[groups[commit_branch][0]]['ansible_host'] }}"
+
+- name: Show build parameters
+  ansible.builtin.debug:
+    msg:
+      - "branch:         {{ commit_branch }} @ {{ commit_short_sha | default('-') }}"
+      - "image:          {{ full_image_name }}:{{ image_tag }}"
+      - "immutable tag:  {{ full_image_name }}:{{ commit_branch }}-{{ commit_short_sha | default('-') }}"
+      - "STAND_ADDRESS:  {{ stand_address if git_repo_name in stand_address_services else '— (не в списке stand_address_services)' }}"
+
+- name: Login to private registry
+  ansible.builtin.command:
+    argv:
+      - docker
+      - login
+      - --username
+      - "{{ nexus_username }}"
+      - --password-stdin
+      - https://{{ registry_url }}
+    stdin: "{{ nexus_password }}"
+  register: login_result
+  changed_when: "'Login Succeeded' in login_result.stdout"
+
+- name: Build image
+  ansible.builtin.command:
+    argv: "{{ ['docker', 'build'] +
+              (['--build-arg=STAND_ADDRESS=' ~ stand_address] if git_repo_name in stand_address_services else []) +
+              ['--tag', full_image_name ~ ':' ~ image_tag, ci_project_dir] }}"
+  register: build_result
+  changed_when: true
+
+- name: Push image
+  ansible.builtin.command:
+    argv:
+      - docker
+      - push
+      - "{{ full_image_name }}:{{ image_tag }}"
+  register: push_result
+  changed_when: true
+
+- name: Tag and push immutable image for ArgoCD
+  ansible.builtin.shell: |
+    docker tag {{ full_image_name }}:{{ image_tag }} {{ full_image_name }}:{{ commit_branch }}-{{ commit_short_sha }}
+    docker push {{ full_image_name }}:{{ commit_branch }}-{{ commit_short_sha }}
+  when:
+    - commit_short_sha | default('') | length > 0
+    - commit_branch in ['develop', 'test', 'master']

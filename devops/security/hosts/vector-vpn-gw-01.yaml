@@ -1,0 +1,39 @@
+api:
+  enabled: false
+
+sources:
+  host_journald:
+    type: journald
+
+transforms:
+  journald_tags:
+    type: remap
+    inputs: [host_journald]
+    source: |
+      u = to_string(._SYSTEMD_UNIT) ?? ""
+      ident = to_string(.SYSLOG_IDENTIFIER) ?? ""
+      allowed_units = ["ssh.service", "sshd.service", "sudo.service", "systemd-logind.service", "ocserv.service", "freeradius.service"]
+      allowed_idents = ["sshd", "sudo", "systemd-logind", "ocserv", "ocserv-main", "freeradius"]
+      if !includes(allowed_units, u) && !includes(allowed_idents, ident) { abort }
+      .unit = if u != "" { u } else { ident }
+      .source_type = "journald"
+      .node_name = "vpn-gw-01"
+
+sinks:
+  victoria_logs_journald:
+    type: elasticsearch
+    inputs: [journald_tags]
+    endpoints:
+      - "http://10.10.10.17:9428/insert/elasticsearch/"
+    mode: bulk
+    api_version: v8
+    compression: gzip
+    healthcheck:
+      enabled: false
+    request:
+      headers:
+        VL-Stream-Fields: "source_type,node_name,unit"
+        VL-Time-Field: "timestamp"
+        VL-Msg-Field: "message"
+        AccountID: "0"
+        ProjectID: "0"

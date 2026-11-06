@@ -1,0 +1,62 @@
+replicaCount: 2
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+imagePullPolicy: Always
+image:
+  repository: docker-registry.example.com/company/facade
+  tag: develop-e0eb4137
+  name: facade
+  pullPolicy: IfNotPresent
+containerPort: 8080
+service:
+  enabled: true
+  port: 8080
+env:
+  ASPNETCORE_ENVIRONMENT: "Development"
+  CLIENTS__PROJECT_MANAGER__URL: "http://projectmanager:8080"
+  CLIENTS__FILE_GENERATOR__URL: "http://filegenerator:8080"
+  CLIENTS__FILE_MANAGER__URL: "http://filemanager:8080"
+  CLIENTS__GIT_MANAGER__URL: "http://gitmanager:8080"
+  CLIENTS__USER_PROFILE__URL: "http://userprofile:8080"
+  CLIENTS__EMAIL_BROKER__URL: "http://emailbroker:8080"
+  CLIENTS__EMAIL_BROKER__EMAIL_FOR_HELP_MESSAGE__0: "support@example.com"
+  CLIENTS__EMAIL_BROKER__EMAIL_FOR_HELP_MESSAGE__1: "support@example.com"
+  CLIENTS__FILE_MANAGER__TEMP_BUCKET_NAME: "company-temp-dev"
+  CLIENTS__FILE_MANAGER__RESULTS_BUCKET_NAME: "company-results-dev"
+  CLIENTS__FILE_MANAGER__PROJECTS_BUCKET_NAME: "company-projects-dev"
+  KESTREL__REQUEST__MAX_BODY_SIZE: "105000000"
+  VALIDATION__ARCHIVE__MAX_ARCHIVE_FILE_SIZE: "10000000"
+  VALIDATION__ARCHIVE__MAX_FOLDER_DEPTH: "10"
+  VALIDATION__ARCHIVE__MAX_ARCHIVE_SIZE: "100000000"
+  VALIDATION__ARCHIVE__MAX_TOTAL_FILES: "1000"
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "192Mi"
+  limits:
+    cpu: "500m"
+    memory: "768Mi"
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 30
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app: facade

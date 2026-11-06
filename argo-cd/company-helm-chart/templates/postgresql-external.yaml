@@ -1,0 +1,18 @@
+{{/*
+ExternalName-сервис для PostgreSQL
+*/}}
+{{- if and .Values.externalDatabase .Values.externalDatabase.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.externalDatabase.serviceName | default (printf "%s-postgres" .Release.Name) }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.externalDatabase.serviceName | default (printf "%s-postgres" .Release.Name) }}
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: helm
+  annotations:
+    example.com/description: "Внешний PostgreSQL на выделенной ВМ."
+spec:
+  type: ExternalName
+  externalName: {{ .Values.externalDatabase.host | required "externalDatabase.host is required when externalDatabase.enabled=true" }}
+{{- end }}

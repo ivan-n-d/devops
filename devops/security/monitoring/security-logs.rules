@@ -1,0 +1,43 @@
+groups:
+  - name: security-logs
+    type: vlogs
+    interval: 1m
+    rules:
+      - alert: SecSSHBruteForce
+        expr: '_stream:{source_type="journald"} AND _time:5m AND ("Failed password" or "Invalid user") | stats by (node_name) count() as hits | filter hits:>20'
+        for: 2m
+        labels:
+          severity: security
+        annotations:
+          summary: "SSH brute-force на {{ $labels.node_name }}"
+          description: "Более {{ $value }} неудачных SSH-входов за 5 минут"
+      - alert: SecSSHForeignIP
+        expr: '_stream:{source_type="journald"} AND "Accepted" AND !_msg:"from 127." AND !_msg:"from 198.51.100.10" AND !_msg:"from 10.10.10." AND !_msg:"from 10.10.20." AND !_msg:"from 192.168.0." | stats by (node_name) count() as logins'
+        labels:
+          severity: security
+        annotations:
+          summary: "SSH-вход с незнакомого IP на {{ $labels.node_name }}"
+          description: "Успешный вход вне whitelist-подсетей (127/198.51.100.10/10.10.10/10.10.20/192.168.0). Проверить: last -w на ноде"
+      - alert: SecSSHPasswordLogin
+        expr: '_stream:{source_type="journald"} AND "Accepted password" | stats by (node_name) count() as logins'
+        labels:
+          severity: security
+        annotations:
+          summary: "Вход по паролю на {{ $labels.node_name }}"
+          description: "Штатный вход — по ключам; вход по паролю требует проверки"
+      - alert: SecWebScanBurst
+        expr: '_stream:{source_type="docker_logs", node_name="edge-01", container_name="traefik"} AND _time:5m AND DownstreamStatus:~"4.." | stats by (ClientHost) count() as hits | filter hits:>150'
+        for: 5m
+        labels:
+          severity: security
+        annotations:
+          summary: "Скан/подбор с {{ $labels.ClientHost }} на границе"
+          description: "Более {{ $value }} ответов 4xx за 5 минут одному клиенту (border-traefik edge-01). Порог калибровать после суток данных"
+      - alert: SecWebServerErrors
+        expr: '_stream:{source_type="docker_logs", node_name="edge-01", container_name="traefik"} AND _time:5m AND DownstreamStatus:~"5.." | stats count() as hits | filter hits:>20'
+        for: 3m
+        labels:
+          severity: security
+        annotations:
+          summary: "Шквал 5xx на веб-границе"
+          description: "{{ $value }} ответов 5xx за 5 минут (border-traefik). Возможен эксплойт или падение бэкенда"

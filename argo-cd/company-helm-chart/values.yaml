@@ -1,0 +1,33 @@
+postgresql:
+  enabled: false
+
+externalDatabase:
+  enabled: false
+  # host: postgres-01.internal.example
+  # serviceName: database-postgres
+
+namespacePolicy:
+  enabled: false
+
+networkPolicy:
+  enabled: false
+
+# RBAC 
+developerRBAC:
+  enabled: false
+
+podDisruptionBudget:
+  enabled: false
+
+ingressRoute:
+  enabled: false
+
+minio:
+  enabled: false
+
+texlive:
+  enabled: false
+  readOnly: true
+
+texliveFontconfig:
+  enabled: false

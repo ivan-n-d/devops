@@ -1,0 +1,45 @@
+deploymentVersion: "0"
+replicaCount: 1
+imagePullPolicy: Always
+image:
+  repository: docker-registry.example.com/company/symbolrecognizer
+  tag: develop-v0.1
+  name: symbol-recognizer
+  pullPolicy: Always
+containerPort: 8000
+service:
+  enabled: true
+  port: 8000
+env:
+  ASPNETCORE_ENVIRONMENT: "Development"
+  FILE_MANAGER_BASE_URL: "http://filemanager:8080"
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "512Mi"
+  limits:
+    cpu: "500m"
+    memory: "1Gi"
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8000
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8000
+  initialDelaySeconds: 30
+  periodSeconds: 30
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app: symbolrecognizer

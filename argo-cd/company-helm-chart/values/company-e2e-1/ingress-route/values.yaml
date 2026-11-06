@@ -1,0 +1,68 @@
+skipDefaultResources: true
+
+ingressRoute:
+  enabled: true
+  name: company-e2e-1-route
+  entryPoints:
+    - web
+  routes:
+    - kind: Rule
+      match: Host(`e2e1.company.local`) && PathPrefix(`/api/swagger`)
+      services:
+        - name: gateway
+          port: 8080
+    - kind: Rule
+      match: Host(`e2e1.company.local`)
+      services:
+        - name: frontend-application
+          port: 80
+    - kind: Rule
+      match: Host(`facade.e2e1.company.local`)
+      services:
+        - name: facade
+          port: 8080
+    - kind: Rule
+      match: Host(`filemanager.e2e1.company.local`)
+      services:
+        - name: filemanager
+          port: 8080
+    - kind: Rule
+      match: Host(`gitmanager.e2e1.company.local`)
+      services:
+        - name: gitmanager
+          port: 8080
+    - kind: Rule
+      match: Host(`projectmanager.e2e1.company.local`)
+      services:
+        - name: projectmanager
+          port: 8080
+    - kind: Rule
+      match: Host(`userprofile.e2e1.company.local`)
+      services:
+        - name: userprofile
+          port: 8080
+    - kind: Rule
+      match: Host(`emailbroker.e2e1.company.local`)
+      services:
+        - name: emailbroker
+          port: 8080
+    - kind: Rule
+      match: Host(`filegenerator.e2e1.company.local`)
+      services:
+        - name: filegenerator
+          port: 8080
+    - kind: Rule
+      match: Host(`ces.e2e1.company.local`)
+      services:
+        - name: collaborativeeditingservice
+          port: 8080
+    - kind: Rule
+      match: Host(`land.e2e1.company.local`)
+      services:
+        - name: landing
+          port: 80
+    - kind: Rule
+      match: Host(`srr.e2e1.company.local`)
+      services:
+        - name: symbolrecognizer
+          port: 8000

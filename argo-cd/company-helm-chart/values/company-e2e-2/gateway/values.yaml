@@ -1,0 +1,85 @@
+deploymentVersion: "1"
+replicaCount: 1
+imagePullPolicy: Always
+image:
+  repository: docker-registry.example.com/company/gateway
+  tag: develop-05e431d9
+  name: gateway
+  pullPolicy: IfNotPresent
+containerPort: 8080
+service:
+  enabled: true
+  port: 8080
+env:
+  ASPNETCORE_ENVIRONMENT: "Development"
+  CLIENTS__PROFILE_SERVICE_URL: "http://userprofile:8080"
+  CLIENTS__EMAIL_BROKER_URL: "http://emailbroker:8080"
+  CLIENTS__PROJECT_MANAGER_URL: "http://projectmanager:8080"
+  CLIENTS__BASE_URL: "http://frontend-application:80"
+  CLIENTS__FACADE_URL: "http://facade:8080"
+  CLIENTS__SYMBOL_RECOGNIZER_URL: "http://symbolrecognizer:8000"
+  IP__BLOCK_TIME: "60000"
+  IP__REQUESTS_NUMBERS: "200"
+  POSTGRES__DATABASE: "e2e2_auth"
+  POSTGRES__HOST: "database-postgres"
+  POSTGRES__PORT: "6441"   # PgBouncer
+  POSTGRES__USERNAME: "e2e2_auth"
+  IS__REFRESH_TOKEN_LIFETIME: "3600"
+  IS__CONFIRM_EMAIL_TOKEN_LIFETIME: "1000"
+  IS__ACCESS_TOKEN_LIFETIME: "1000"
+  IS__CLIENT_ID: "0000-0000-0000-0000"
+  IS__CLIENT_SECRET: "change-me-client-secret"
+  MAX_FILE_SIZE: "1073741824"
+  USER_TIME_EXPIRATION: "1000"
+  HASH_USERS: "true"
+  EMAIL_CODE__LIFETIME_S: "120"
+  EMAIL_CODE__RESEND_COOLDOWN_S: "60"
+
+
+
+secretEnv:
+  POSTGRES__PASSWORD: ""
+
+sealedSecrets:
+  - apiVersion: bitnami.com/v1alpha1
+    kind: SealedSecret
+    metadata:
+      name: gateway-secret
+      namespace: company-e2e-2
+    spec:
+      encryptedData:
+        POSTGRES__PASSWORD: REPLACE_WITH_KUBESEAL
+      template:
+        metadata:
+          name: gateway-secret
+          namespace: company-e2e-2  
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "256Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1000Mi"
+
+readinessProbe:
+  httpGet:
+    path: /api/Health
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+livenessProbe:
+  httpGet:
+    path: /api/Health
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 30
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app: gateway

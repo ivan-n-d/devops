@@ -1,0 +1,259 @@
+version: "3.9"
+services:
+  frontend-application:
+    container_name: frontend-application
+    image: docker-registry.example.com/company/frontend-application:test-v0.1
+#    environment:
+#      ASPNETCORE_ENVIRONMENT: Development
+    ports:
+      - 80:80
+#    volumes:
+#      - ./Configuration/gateway/appsettings.json:/app/appsettings.json:ro
+#    depends_on:
+#      - pg
+    networks:
+      - company-network
+    restart: always
+
+  userprofile:
+    container_name: userprofile
+    image: docker-registry.example.com/company/userprofile:test-v0.1
+    ports:
+      - 4002:8080
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      POSTGRES_PASSWORD: CHANGE_ME_POSTGRES_PASSWORD
+      POSTGRES_DB: UserProfiles
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: postgres
+    restart: always
+    networks:
+      - company-network
+
+  projectmanager:
+    container_name: projectmanager
+    image: docker-registry.example.com/company/projectmanager:test-v0.1
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      PG__HOST: postgres
+      PG__PORT: 5432
+      PG__DATABASE: ProjectManagerService
+      PG__USERNAME: postgres
+      PG__PASSWORD: CHANGE_ME_POSTGRES_PASSWORD
+    ports:
+      - 4001:8080
+    networks:
+      - company-network
+    restart: always
+
+#  userprofile:
+#    container_name: userprofile
+#    image: docker-registry.example.com/company/userprofile:test-v0.1
+#    ports:
+#      - 4002:8080
+#    environment:
+#      ASPNETCORE_ENVIRONMENT: Development
+#      POSTGRES_PASSWORD: admin123
+#      POSTGRES_DB: UserProfiles
+#      POSTGRES_HOST: 10.10.10.23
+#      POSTGRES_PORT: 5432
+#      POSTGRES_USER: admin
+#    restart: always
+#    networks:
+#      - company-network
+#    volumes:
+#      - ./conf/userprofile/appsettings.json:/app/appsettings.json:ro
+  facade:
+    container_name: facade
+    image: docker-registry.example.com/company/facade:test-v0.1
+    ports:
+      - 4006:8080
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      CLIENTS__PROJECT_MANAGER__URL: http://projectmanager:8080
+      CLIENTS__FILE_GENERATOR__URL: http://filegenerator:8080
+      CLIENTS__FILE_MANAGER__URL: http://filemanager:8080
+      CLIENTS__GIT_MANAGER__URL: http://gitmanager:8080
+      CLIENTS__USER_PROFILE__URL: http://userprofile:8080
+      CLIENTS__EMAIL_BROKER__URL: http://emailbroker:8080
+      CLIENTS__EMAIL_BROKER__EMAIL_FOR_HELP_MESSAGE__0: support@example.com
+      CLIENTS__EMAIL_BROKER__EMAIL_FOR_HELP_MESSAGE__1: support@example.com
+      CLIENTS__FILE_MANAGER__TEMP_BUCKET_NAME: company-temp-test
+      CLIENTS__FILE_MANAGER__RESULTS_BUCKET_NAME: company-results-test
+      CLIENTS__FILE_MANAGER__PROJECTS_BUCKET_NAME: company-projects-test
+    networks:
+      - company-network
+    restart: always
+
+  gitmanager:
+    container_name: gitmanager
+    image: docker-registry.example.com/company/gitmanager:test-v0.1
+    ports:
+      - 4007:8080
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      KESTREL__REQUEST__MAX_BODY_SIZE: 105000000
+      CLIENT__FILE_MANAGER__URI: http://filemanager:8080
+      CLIENT__FILE_MANAGER__PROJECTS_BUCKET_NAME: company-projects-test
+    restart: always
+    networks:
+      - company-network
+
+
+  emailbroker:
+    image: docker-registry.example.com/company/emailbroker:test-v0.1
+    hostname: emailbroker
+    container_name: emailbroker
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      MAIL_CLIENT__HOST: smtp.example.com
+      MAIL_CLIENT__PORT: 465
+      MAIL_CLIENT__USE_SSL: true
+      MAIL_CLIENT__LOGIN: dev@example.com
+      MAIL_CLIENT__PASSWORD: CHANGE_ME_SMTP_PASSWORD
+      EMAIL__NAME: Company
+      EMAIL__ADDRESS: dev@example.com
+    volumes:
+      - /srv/company/conf/emailbroker/appsettings.json:/app/appsettings.json:ro
+    ports:
+      - 4009:8080
+    networks:
+      - company-network
+    restart: always
+
+
+  symbol-recognizer-service:
+    container_name: symbol-recognizer-service
+    image: docker-registry.example.com/company/symbol-recognizer-service:test-v0.1
+    ports:
+      - 8080:8080
+    networks:
+      - company-network
+    restart: always
+
+  filemanager:
+    container_name: filemanager
+    image: docker-registry.example.com/company/filemanager:test-v0.1
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      MINIO__PROTOCOL: http
+      MINIO__ADDRESS: 10.10.10.40:9000
+      MINIO__ACCESS_KEY: admin
+      MINIO__SECRET_KEY: ***
+      FILE__MAX_SIZE: 105000000
+      FILE__TIME_EXPIRATION_URI_MILLISECONDS: 600000
+      FILE__TIME_EXPIRATION_MILLISECONDS: 600000
+    ports:
+      - 4004:8080
+    networks:
+      - company-network
+    restart: always
+
+#  projectmanager:
+#    container_name: projectmanager
+#    image: docker-registry.example.com/company/projectmanager:test-v0.1
+#    environment:
+#      ASPNETCORE_ENVIRONMENT: Development
+#    ports:
+#      - 4001:8080
+#    networks:
+#      - company-network
+#    restart: always
+#    volumes:
+#      - ./conf/projectmanager/appsettings.json:/app/appsettings.json:ro
+#      - ./conf/projectmanager/Migrations.xml:/app/Migrations.xml:ro
+
+  filegenerator:
+    container_name: filegenerator
+    image: docker-registry.example.com/company/filegenerator:test-v0.1
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      PROJECT_MANAGER_CLIENT_URI: http://projectmanager:8080
+      FILE_MANAGER_CLIENT_URI: http://filemanager:8080
+    ports:
+      - 4003:8080
+    networks:
+      - company-network
+    restart: always
+    volumes:
+      - ./conf/filegenerator/appsettings.json:/app/appsettings.json:ro
+
+  pg:
+    image: postgres:15.4
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: CHANGE_ME_POSTGRES_PASSWORD
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: always
+    networks:
+      - company-network
+
+  pgadmin:
+    container_name: pgadmin
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: CHANGE_ME_PGADMIN_PASSWORD
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+       - pgadmin:/var/lib/pgadmin
+    ports:
+      - "8800:80"
+    networks:
+      - company-network
+    restart: always
+    depends_on:
+      - pg
+
+  convergerce:
+    image: docker-registry.example.com/company/convergence-omnibus:v0.1
+    container_name: convergence
+    ports:
+      - "8000:80"
+#    enviroment:
+#     - ORIENTDB_OPTS_MEMORY="-Xms200M -Xmx200M -XX:MaxDirectMemorySize=200M"
+    volumes:
+      - "convergence-omnibus:/orientdb/databases"
+    restart: always
+
+  auth:
+    container_name: auth
+    image: docker-registry.example.com/company/auth:test-v0.1
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+    ports:
+      - "4005:8080"
+    restart: always
+    networks:
+      - company-network
+    volumes:
+      - ./conf/auth/appsettings.json:/app/appsettings.json:ro
+
+  colab-edit-alg:
+    container_name: colabeditalg
+    image: docker-registry.example.com/company/colabeditalgorithm:test-v0.1
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+    ports:
+      - "4321:8080"
+    restart: always
+    networks:
+      - company-network
+#    volumes:
+#      - ./conf/auth/appsettings.json:/app/appsettings.json:ro
+
+
+networks:
+  company-network:
+    driver: bridge
+
+
+volumes:
+    pgdata: {}
+    pgadmin: {}
+    convergence-omnibus: {}

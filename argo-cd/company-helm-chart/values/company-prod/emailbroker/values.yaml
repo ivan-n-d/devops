@@ -1,0 +1,65 @@
+replicaCount: 1
+imagePullPolicy: Always
+image:
+  repository: docker-registry.example.com/company/emailbroker
+  tag: master-105be164
+  name: emailbroker
+  pullPolicy: IfNotPresent
+containerPort: 8080
+service:
+  enabled: true
+  port: 8080
+env:
+  ASPNETCORE_ENVIRONMENT: "Development"
+  MAIL_CLIENT__HOST: "mail-01.example.com"
+  MAIL_CLIENT__PORT: "465"
+  MAIL_CLIENT__USE_SSL: "true"
+  MAIL_CLIENT__LOGIN: "info@example.com"
+  EMAIL__NAME: "Company"
+  EMAIL__ADDRESS: "info@example.com"
+
+
+secretEnv:
+  MAIL_CLIENT__PASSWORD: ""
+
+sealedSecrets:
+  - apiVersion: bitnami.com/v1alpha1
+    kind: SealedSecret
+    metadata:
+      name: emailbroker-secret
+      namespace: company-prod
+    spec:
+      encryptedData:
+        MAIL_CLIENT__PASSWORD: REPLACE_WITH_KUBESEAL
+      template:
+        metadata:
+          name: emailbroker-secret
+          namespace: company-prod
+resources:
+  requests:
+    cpu: "100m"
+    memory: "192Mi"
+  limits:
+    cpu: "1000m"
+    memory: "768Mi"
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 30
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app: emailbroker

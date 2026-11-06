@@ -1,0 +1,6 @@
+env:
+  ASPNETCORE_ENVIRONMENT: "Development"
+  POSTGRES_DB: "e2e2_userprofiles"
+  POSTGRES_HOST: "database-postgres"
+  POSTGRES_PORT: "6442"   # PgBouncer
+  POSTGRES_USER: "e2e2_profiles"

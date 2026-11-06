@@ -1,0 +1,8 @@
+env:
+  ASPNETCORE_ENVIRONMENT: "Development"
+  KESTREL__REQUEST__MAX_BODY_SIZE: "209715200"
+  CLIENTS__PROJECT_MANAGER__URL: "http://projectmanager:8080"
+  CLIENTS__FILE_MANAGER__URL: "http://filemanager:8080"
+  CLIENTS__GIT_MANAGER__URL: "http://gitmanager:8080"
+  PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  HOME: "/tmp"

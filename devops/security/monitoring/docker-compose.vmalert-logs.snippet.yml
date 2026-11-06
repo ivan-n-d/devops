@@ -1,0 +1,21 @@
+  vmalert-logs:
+    logging:
+      driver: "json-file"
+      options:
+        max-size: 10m
+        max-file: "3"
+    restart: always
+    image: victoriametrics/vmalert:v1.155.0
+    container_name: vmalert-logs
+    network_mode: host
+    command:
+      - "--datasource.url=http://127.0.0.1:9428"
+      - "--remoteRead.url=http://127.0.0.1:8481/select/0/prometheus"
+      - "--remoteWrite.url=http://127.0.0.1:8480/insert/0/prometheus"
+      - "--notifier.url=http://127.0.0.1:9093/"
+      - "--rule=/etc/alerts/security-logs.rules"
+      - "--external.label=source=vmalert-logs"
+      - "--evaluationInterval=30s"
+      - "--httpListenAddr=:8881"
+    volumes:
+      - "./alerts:/etc/alerts/:ro,Z"

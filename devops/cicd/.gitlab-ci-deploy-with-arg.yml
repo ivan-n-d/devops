@@ -1,0 +1,98 @@
+variables:
+  ANSIBLE_CONFIG: ./devops/ansible/ansible.cfg
+  ANSIBLE_FORCE_COLOR: 'true'
+
+
+stages:
+  - build_image
+  - deploy_argocd
+
+
+build-image:
+  stage: build_image
+  image:
+    name: docker-registry.example.com/library/ansible-with-docker:latest
+  tags:
+    - docker
+  script:
+    - git clone https://$DEVOPS_TOKEN_NAME:$DEVOPS_TOKEN@gitlab.example.com/company/devops.git
+    - ansible-playbook --inventory ./devops/ansible/inventory/hosts.yml ./devops/ansible/main-with-arg.yml
+  only:
+    refs:
+      - develop
+      - test
+      - master
+
+
+.bump_argocd:
+  stage: deploy_argocd
+  image:
+    name: docker-registry.example.com/library/ansible:p3.12.13-bookworm-v2 # Переделать браз, 600мб слишком дофига
+  tags:
+    - docker
+  needs: ["build-image"]
+  variables:
+    STAND_DIR: ""
+  script:
+    - git clone https://$ARCOCD_PUSH_TOKEN_NAME:$ARCOCD_PUSH_TOKEN@gitlab.example.com/company/argo-cd.git
+    - cd argo-cd
+    - git checkout develop
+    - VALUES_FILE="company-helm-chart/values/$STAND_DIR/$CI_PROJECT_NAME/values.yaml"
+    - |
+      if [ ! -f "$VALUES_FILE" ]; then
+        echo "ERROR: $VALUES_FILE not found in argo-cd repo"
+        echo "Available services in $STAND_DIR:"
+        ls "company-helm-chart/values/$STAND_DIR/"
+        exit 1
+      fi
+    - 'NEW_TAG="$CI_COMMIT_BRANCH-$CI_COMMIT_SHORT_SHA" && sed -i "s#^  tag:.*#  tag: $NEW_TAG#" "$VALUES_FILE"'
+    - echo "=== Обновлённый $VALUES_FILE ==="
+    - head -12 "$VALUES_FILE"
+    - git config user.email "test@example.com"
+    - git config user.name "Argocd"
+    - git add "$VALUES_FILE"
+    - |
+      if git diff --cached --quiet; then
+        echo "ℹ️  No changes (tag already up-to-date)"
+      else
+        git commit -m "ci($STAND_DIR): bump $CI_PROJECT_NAME to $CI_COMMIT_BRANCH-$CI_COMMIT_SHORT_SHA"
+        git push origin develop
+        echo "✓ Pushed bump to argo-cd/develop ($STAND_DIR)"
+      fi
+
+
+bump_argocd_dev:
+  extends: .bump_argocd
+  variables:
+    STAND_DIR: company-dev
+  only:
+    refs:
+      - develop
+
+
+bump_argocd_test:
+  extends: .bump_argocd
+  variables:
+    STAND_DIR: company-test
+  only:
+    refs:
+      - test
+
+
+bump_argocd_preprod:
+  extends: .bump_argocd
+  variables:
+    STAND_DIR: company-preprod
+  only:
+    refs:
+      - master
+
+
+bump_argocd_prod:
+  extends: .bump_argocd
+  variables:
+    STAND_DIR: company-prod
+  only:
+    refs:
+      - master
+  when: manual

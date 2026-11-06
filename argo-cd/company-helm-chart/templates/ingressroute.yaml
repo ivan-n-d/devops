@@ -1,0 +1,51 @@
+{{- if and .Values.ingressRouteWeb .Values.ingressRouteWeb.enabled }}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Values.ingressRouteWeb.middlewareName | default "https-redirect" }}
+  namespace: {{ .Values.namespaceOverride | default .Release.Namespace }}
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ .Values.ingressRouteWeb.name | default (printf "%s-web" (index .Values.ingressRoute "name" | default "main-route")) }}
+  namespace: {{ .Values.namespaceOverride | default .Release.Namespace }}
+spec:
+  entryPoints:
+    - web
+  routes:
+  {{- range .Values.ingressRouteWeb.routes }}
+    - {{- toYaml . | nindent 6 }}
+      middlewares:
+        - name: {{ $.Values.ingressRouteWeb.middlewareName | default "https-redirect" }}
+  {{- end }}
+{{- end }}
+---
+{{- if .Values.ingressRoute.enabled }}
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ .Values.ingressRoute.name | default "main-route" }}
+  namespace: {{ .Values.namespaceOverride | default .Release.Namespace }}
+spec:
+  entryPoints:
+    {{- toYaml .Values.ingressRoute.entryPoints | nindent 4 }}
+  {{- with .Values.ingressRoute.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  routes:
+  {{- if and .Values.maintenance .Values.maintenance.enabled }}
+    - kind: Rule
+      match: PathPrefix(`/`)
+      services:
+        - name: frontend-application
+          port: 80
+  {{- else }}
+    {{- toYaml .Values.ingressRoute.routes | nindent 4 }}
+  {{- end }}
+{{- end }}

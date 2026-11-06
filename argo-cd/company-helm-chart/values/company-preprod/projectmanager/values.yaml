@@ -1,0 +1,63 @@
+replicaCount: 1
+imagePullPolicy: Always
+image:
+  repository: docker-registry.example.com/company/projectmanager
+  tag: master-v0.1
+  name: projectmanager
+  pullPolicy: IfNotPresent
+containerPort: 8080
+service:
+  enabled: true
+  port: 8080
+env:
+  ASPNETCORE_ENVIRONMENT: "Development"
+  PG__HOST: "database-postgres"
+  PG__PORT: "6435"
+  PG__DATABASE: "ProjectManagerService"
+  PG__USERNAME: "projects_staging"
+
+secretEnv:
+  PG__PASSWORD: ""
+
+sealedSecrets:
+  - apiVersion: bitnami.com/v1alpha1
+    kind: SealedSecret
+    metadata:
+      name: projectmanager-secret
+      namespace: company-preprod
+    spec:
+      encryptedData:
+        PG__PASSWORD: REPLACE_WITH_KUBESEAL
+      template:
+        metadata:
+          name: projectmanager-secret
+          namespace: company-preprod
+
+resources:
+  requests:
+    cpu: "150m"
+    memory: "256Mi"
+  limits:
+    cpu: "1000m"
+    memory: "768Mi"
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 30
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app: projectmanager

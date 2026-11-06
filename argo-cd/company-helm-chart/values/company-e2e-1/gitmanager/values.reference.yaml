@@ -1,0 +1,6 @@
+env:
+  ASPNETCORE_ENVIRONMENT: "Development"
+  KESTREL__REQUEST__MAX_BODY_SIZE: "105000000"
+  CLIENT__FILE_MANAGER__URI: "http://filemanager:8080"
+  CLIENT__FILE_MANAGER__PROJECTS_BUCKET_NAME: "company-projects-e2e1"
+  CLIENT__PROJECT_MANAGER__URI: "http://projectmanager:8080"

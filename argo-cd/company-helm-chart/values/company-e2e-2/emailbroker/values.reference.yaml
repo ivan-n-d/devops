@@ -1,0 +1,9 @@
+env:
+  ASPNETCORE_ENVIRONMENT: "Development"
+  MAIL_CLIENT__HOST: "smtp.example.com"
+  MAIL_CLIENT__PORT: "465"
+  MAIL_CLIENT__USE_SSL: "true"
+  MAIL_CLIENT__LOGIN: "dev@example.com"
+  MAIL_CLIENT__PASSWORD: "CHANGE_ME_SMTP_PASSWORD"
+  EMAIL__NAME: "Company"
+  EMAIL__ADDRESS: "dev@example.com"

@@ -1,0 +1,28 @@
+- name: Build and push Docker image with IP from inventory
+  hosts: localhost
+  gather_facts: no
+  environment:
+    DOCKER_HOST: "unix:///var/run/docker.sock"
+    BUILDKIT_PROGRESS: plain
+  vars:
+    commit_branch: "{{ lookup('env', 'CI_COMMIT_BRANCH') }}"
+    commit_short_sha: "{{ lookup('env', 'CI_COMMIT_SHORT_SHA') }}"
+    git_repo_name: "{{ lookup('pipe', 'basename $CI_PROJECT_DIR') }}"
+    nexus_username: "{{ lookup('env', 'NEXUS_USERNAME') }}"
+    nexus_password: "{{ lookup('env', 'NEXUS_PASSWORD') }}"
+    ci_project_dir: "{{ lookup('env', 'CI_PROJECT_DIR') | default('.') }}"
+
+    registry_url: "docker-registry.example.com"
+    registry_host: "docker-registry.example.com"
+    image_path: "company/{{ git_repo_name }}"
+    full_image_name: "{{ registry_host }}/{{ image_path }}"
+    image_tag: "{{ commit_branch }}-v0.1"
+    stand_address_services:
+      - projectmanager
+      - gitmanager
+      - filegenerator
+      - facade
+      - gateway
+      - collaborativeeditingservice
+  roles:
+    - deploy-with-arg

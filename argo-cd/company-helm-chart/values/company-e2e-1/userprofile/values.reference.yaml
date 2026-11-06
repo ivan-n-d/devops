@@ -1,0 +1,6 @@
+env:
+  ASPNETCORE_ENVIRONMENT: "Development"
+  POSTGRES_DB: "e2e1_userprofiles"
+  POSTGRES_HOST: "database-postgres"
+  POSTGRES_PORT: "6442"
+  POSTGRES_USER: "e2e1_profiles"

@@ -1,0 +1,77 @@
+deploymentVersion: "1"
+replicaCount: 1
+imagePullPolicy: Always
+image:
+  repository: docker-registry.example.com/company/filegenerator
+  tag: develop-aba35a24
+  name: filegenerator
+  pullPolicy: IfNotPresent
+containerPort: 8080
+service:
+  enabled: true
+  port: 8080
+env:
+  ASPNETCORE_ENVIRONMENT: "Development"
+  KESTREL__REQUEST__MAX_BODY_SIZE: "209715200"
+  CLIENTS__PROJECT_MANAGER__URL: "http://projectmanager:8080" #поменять на других стендах!!!
+  CLIENTS__FILE_MANAGER__URL: "http://filemanager:8080" #поменять на других стендах!!!
+  CLIENTS__GIT_MANAGER__URL: "http://gitmanager:8080" #поменять на других стендах!!!
+  PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  HOME: "/tmp"
+
+texlive:
+  enabled: true
+  mountPath: /usr/local/texlive
+  hostPath: /usr/local/texlive
+  readOnly: false  # fontconfig создаёт .uuid файлы в директориях шрифтов
+texliveFontconfig:
+  enabled: true
+
+containerSecurityContext:
+  privileged: true
+
+# texlive: "true" — обязателен всегда. Tex Live лежит на
+# ноде и монтируется через hostPath, в образе его нет. Под НЕ должен попасть
+# на ноду без него — иначе hostPath-том не смонтируется.
+#При добавлении нового воркера (worker03 и далее) ОБЯЗАТЕЛЬНО:
+# поставить обе версии TeX Live в /usr/local/texlive/{2024,2025}
+# только потом ставить лейбл: kubectl label node <node> texlive=true
+#Иначе поды компиляции уедут на неподготовленную ноду.
+nodeSelector:
+  texlive: "true"
+# При replicas=3 + texlive=true на 3 воркерах - 1 под на каждый воркер.
+# Это САМЫЙ важный сервис для topologySpread: компиляция LaTeX CPU-bound,
+# масштабирование на несколько нод = пропорциональный рост throughput.
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app: filegenerator
+
+resources:
+  requests:
+    cpu: "300m"
+    memory: "512Mi"
+  limits:
+    cpu: "2500m"
+    memory: "4000Mi"
+
+podDisruptionBudget:
+  enabled: false # Ставть true при 3 репликах
+  maxUnavailable: 1
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 30

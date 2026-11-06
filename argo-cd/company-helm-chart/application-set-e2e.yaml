@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: company-e2e-apps
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://gitlab.example.com/company/argo-cd
+        revision: develop
+        directories:
+          - path: "company-helm-chart/values/company-e2e-1/*"
+          - path: "company-helm-chart/values/company-e2e-2/*"
+  template:
+    metadata:
+      name: "{{ .path.basename }}-{{ index .path.segments 2 }}"
+    spec:
+      project: default
+      source:
+        repoURL: https://gitlab.example.com/company/argo-cd
+        targetRevision: develop
+        path: company-helm-chart
+        helm:
+          releaseName: "{{ .path.basename }}"
+          valueFiles:
+            - "values/{{ index .path.segments 2 }}/{{ .path.basename }}/values.yaml"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{ index .path.segments 2 }}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

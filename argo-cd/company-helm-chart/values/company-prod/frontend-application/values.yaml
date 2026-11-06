@@ -1,0 +1,46 @@
+replicaCount: 1
+imagePullPolicy: Always
+image:
+  repository: docker-registry.example.com/company/frontend-application
+  tag: master-aca8ec54
+  name: frontend-application
+  pullPolicy: IfNotPresent
+containerPort: 80
+environment: company-prod
+serviceName: frontend-application
+useNginxConfig: true
+maintenance:
+  enabled: false # Включение заглушки техработ - также включить в values ingress-route
+useNginxMainConfig: true
+service:
+  enabled: true
+  port: 80
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "600m"
+    memory: "512Mi"
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 80
+  initialDelaySeconds: 5
+  periodSeconds: 5
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 80
+  initialDelaySeconds: 15
+  periodSeconds: 15
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app: frontend-application

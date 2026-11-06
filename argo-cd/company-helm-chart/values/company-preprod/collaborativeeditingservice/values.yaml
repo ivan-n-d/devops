@@ -1,0 +1,47 @@
+replicaCount: 1
+imagePullPolicy: Always
+image:
+  repository: docker-registry.example.com/company/collaborativeeditingservice
+  tag: master-v0.1
+  name: collaborativeeditingservice
+  pullPolicy: IfNotPresent
+containerPort: 8080
+service:
+  enabled: true
+  port: 8080
+env:
+  ASPNETCORE_ENVIRONMENT: "Development"
+  KESTREL__REQUEST__MAX_BODY_SIZE: "105000000"
+  CONNECTION__WEB_SOCKET__WAITING_RESTORE_TIME_S: "300"
+  CONNECTION__WEB_SOCKET__SENDING_QUEUE_SIZE: "600"
+  CLIENT__GIT_MANAGER__URI: "http://gitmanager:8080"
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "256Mi"
+  limits:
+    cpu: "500m"
+    memory: "768Mi"
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 30
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app: collaborativeeditingservice

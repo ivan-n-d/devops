@@ -1,0 +1,19 @@
+{{- if .Values.useNginxConfig }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-nginx-config
+data:
+  default.conf: |
+{{ .Files.Get (printf "conf/%s/%s/default.conf" .Values.environment .Values.serviceName) | indent 4 }}
+  {{- if .Values.useNginxMainConfig }}
+  nginx.conf: |
+{{ .Files.Get (printf "conf/%s/%s/nginx.conf" .Values.environment .Values.serviceName) | indent 4 }}
+  {{- end }}
+  {{- if .Values.maintenance }}
+  maintenance.conf: |
+{{ .Files.Get (printf "conf/%s/%s/maintenance.conf" .Values.environment .Values.serviceName) | indent 4 }}
+  maintenance.html: |
+{{ .Files.Get (printf "conf/%s/%s/maintenance.html" .Values.environment .Values.serviceName) | indent 4 }}
+  {{- end }}
+{{- end }}

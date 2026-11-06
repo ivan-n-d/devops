@@ -1,0 +1,64 @@
+replicaCount: 1
+imagePullPolicy: Always
+image:
+  repository: docker-registry.example.com/company/userprofile
+  tag: develop-a0c75bbf
+  name: userprofile
+  pullPolicy: IfNotPresent
+containerPort: 8080
+service:
+  enabled: true
+  port: 8080
+env:
+  ASPNETCORE_ENVIRONMENT: "Development"
+  POSTGRES_DB: "UserProfiles"
+  POSTGRES_HOST: "database-postgres"
+  POSTGRES_PORT: "6436"   # PgBouncer
+  POSTGRES_USER: "profiles_dev"
+
+secretEnv:
+  POSTGRES_PASSWORD: ""
+
+sealedSecrets:
+  - apiVersion: bitnami.com/v1alpha1
+    kind: SealedSecret
+    metadata:
+      name: userprofile-secret
+      namespace: company-dev
+    spec:
+      encryptedData:
+        POSTGRES_PASSWORD: REPLACE_WITH_KUBESEAL
+      template:
+        metadata:
+          name: userprofile-secret
+          namespace: company-dev
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "192Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1000Mi"
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 30
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app: userprofile

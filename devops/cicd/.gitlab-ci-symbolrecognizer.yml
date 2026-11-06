@@ -1,0 +1,86 @@
+variables:
+  ANSIBLE_CONFIG: ./devops/ansible/ansible.cfg
+  ANSIBLE_FORCE_COLOR: 'true'
+
+
+stages:
+  - build_image
+  - deploy_argocd
+
+
+build-image-symbolrecognizer:
+  stage: build_image
+  image:
+    name: docker-registry.example.com/library/ansible-with-docker:latest
+  tags:
+    - docker
+  when: manual
+  script:
+    - git clone https://$DEVOPS_TOKEN_NAME:$DEVOPS_TOKEN@gitlab.example.com/company/devops.git
+    - ansible-playbook --inventory ./devops/ansible/inventory/hosts.yml ./devops/ansible/main-with-arg.yml
+  only:
+    refs:
+      - develop
+
+
+.rollout_symbolrecognizer:
+  stage: deploy_argocd
+  image:
+    name: docker-registry.example.com/library/ansible:p3.12.13-bookworm-v2 # Переделать браз, 600мб слишком дофига
+  tags:
+    - docker
+  needs: ["build-image-symbolrecognizer"]
+  when: manual
+  only:
+    refs:
+      - develop
+  variables:
+    STAND_DIR: ""
+  script:
+    - git clone https://$ARCOCD_PUSH_TOKEN_NAME:$ARCOCD_PUSH_TOKEN@gitlab.example.com/company/argo-cd.git
+    - cd argo-cd
+    - git checkout develop
+    - VALUES_FILE="company-helm-chart/values/$STAND_DIR/symbolrecognizer/values.yaml"
+    - |
+      if [ ! -f "$VALUES_FILE" ]; then
+        echo "ERROR: $VALUES_FILE not found in argo-cd repo"
+        exit 1
+      fi
+    - 'sed -i "s#^deploymentVersion:.*#deploymentVersion: \"$(date -u +%Y%m%d%H%M%S)\"#" "$VALUES_FILE"'
+    - echo "=== Обновлённый $VALUES_FILE ==="
+    - head -12 "$VALUES_FILE"
+    - git config user.email "test@example.com"
+    - git config user.name "Argocd"
+    - git add "$VALUES_FILE"
+    - |
+      if git diff --cached --quiet; then
+        echo "ℹ️  No changes (deploymentVersion already up-to-date)"
+      else
+        git commit -m "ci($STAND_DIR): rollout symbolrecognizer (deploymentVersion bump, тег develop-v0.1)"
+        git push origin develop
+        echo "✓ Pushed rollout bump to argo-cd/develop ($STAND_DIR)"
+      fi
+
+
+rollout_symbolrecognizer_dev:
+  extends: .rollout_symbolrecognizer
+  variables:
+    STAND_DIR: company-dev
+
+
+rollout_symbolrecognizer_test:
+  extends: .rollout_symbolrecognizer
+  variables:
+    STAND_DIR: company-test
+
+
+rollout_symbolrecognizer_preprod:
+  extends: .rollout_symbolrecognizer
+  variables:
+    STAND_DIR: company-preprod
+
+
+rollout_symbolrecognizer_prod:
+  extends: .rollout_symbolrecognizer
+  variables:
+    STAND_DIR: company-prod

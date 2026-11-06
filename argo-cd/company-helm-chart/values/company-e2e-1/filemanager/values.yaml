@@ -1,0 +1,73 @@
+deploymentVersion: "1"
+replicaCount: 2
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+imagePullPolicy: Always
+image:
+  repository: docker-registry.example.com/company/filemanager
+  tag: develop-ac6d7248
+  pullPolicy: IfNotPresent
+  name: filemanager
+containerPort: 8080
+service:
+  enabled: true
+  port: 8080
+env:
+  ASPNETCORE_ENVIRONMENT: "Development"
+  MINIO__PROTOCOL: "http"
+  MINIO__ADDRESS: "10.10.10.40:9000"
+  FILE__MAX_SIZE: "209715200"
+  FILE__TIME_EXPIRATION_URI_MILLISECONDS: "600000"
+  FILE__TIME_EXPIRATION_MILLISECONDS: "600000"
+
+
+
+secretEnv:
+  MINIO__ACCESS_KEY: ""
+  MINIO__SECRET_KEY: ""
+
+sealedSecrets:
+  - apiVersion: bitnami.com/v1alpha1
+    kind: SealedSecret
+    metadata:
+      name: filemanager-secret
+      namespace: company-e2e-1
+    spec:
+      encryptedData:
+        MINIO__ACCESS_KEY: REPLACE_WITH_KUBESEAL
+        MINIO__SECRET_KEY: REPLACE_WITH_KUBESEAL
+      template:
+        metadata:
+          name: filemanager-secret
+          namespace: company-e2e-1
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "256Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1500Mi"
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 30
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app: filemanager

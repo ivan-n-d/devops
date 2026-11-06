@@ -1,0 +1,74 @@
+{{- if .Values.minio.enabled }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-minio-secret
+type: Opaque
+stringData:
+  root-user: {{ .Values.minio.rootUser | default "minioadmin" }}
+  root-password: {{ .Values.minio.rootPassword | required "minio.rootPassword required" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-minio
+spec:
+  type: {{ .Values.minio.service.type | default "ClusterIP" }}
+  ports:
+  - name: api
+    port: 9000
+  - name: console
+    port: 9001
+  selector:
+    app: {{ .Release.Name }}-minio
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-minio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-minio
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-minio
+    spec:
+      containers:
+      - name: minio
+        image: {{ .Values.minio.image | default "minio/minio:latest" }}
+        args: ["server", "/data", "--console-address", ":9001"]
+        env:
+        - name: MINIO_ROOT_USER
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-minio-secret
+              key: root-user
+        - name: MINIO_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-minio-secret
+              key: root-password
+        ports:
+        - containerPort: 9000
+        - containerPort: 9001
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: {{ .Release.Name }}-minio-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-minio-pvc
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: {{ .Values.minio.storageSize | default "10Gi" }}   
+{{- end }}

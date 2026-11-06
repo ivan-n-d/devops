@@ -1,0 +1,68 @@
+skipDefaultResources: true
+
+ingressRoute:
+  enabled: true
+  name: company-dev-route
+  entryPoints:
+    - web
+  routes:
+    - kind: Rule
+      match: Host(`dev.company-k8s.local`) && PathPrefix(`/api/swagger`)
+      services:
+        - name: gateway
+          port: 8080
+    - kind: Rule
+      match: Host(`dev.company-k8s.local`)
+      services:
+        - name: frontend-application
+          port: 80
+    - kind: Rule
+      match: Host(`facade.dev.company-k8s.local`)
+      services:
+        - name: facade
+          port: 8080
+    - kind: Rule
+      match: Host(`filemanager.dev.company-k8s.local`)
+      services:
+        - name: filemanager
+          port: 8080
+    - kind: Rule
+      match: Host(`gitmanager.dev.company-k8s.local`)
+      services:
+        - name: gitmanager
+          port: 8080
+    - kind: Rule
+      match: Host(`projectmanager.dev.company-k8s.local`)
+      services:
+        - name: projectmanager
+          port: 8080
+    - kind: Rule
+      match: Host(`userprofile.dev.company-k8s.local`)
+      services:
+        - name: userprofile
+          port: 8080
+    - kind: Rule
+      match: Host(`emailbroker.dev.company-k8s.local`)
+      services:
+        - name: emailbroker
+          port: 8080
+    - kind: Rule
+      match: Host(`filegenerator.dev.company-k8s.local`)
+      services:
+        - name: filegenerator
+          port: 8080
+    - kind: Rule
+      match: Host(`collaborativeeditingservice.dev.company-k8s.local`)
+      services:
+        - name: collaborativeeditingservice
+          port: 8080
+    - kind: Rule
+      match: Host(`land.dev.company-k8s.local`)
+      services:
+        - name: landing
+          port: 80
+    - kind: Rule
+      match: Host(`symbolrecognizer.dev.company-k8s.local`)
+      services:
+        - name: symbolrecognizer
+          port: 8000

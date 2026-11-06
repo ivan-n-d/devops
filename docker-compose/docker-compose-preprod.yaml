@@ -1,0 +1,262 @@
+version: "3.9"
+services:
+
+  minio:
+    image: minio/minio:RELEASE.2024-04-18T19-09-19Z-cpuv1
+    container_name: minio
+    command: server -C /etc/minio/certs --console-address ":9001" /data/
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: CHANGE_ME_MINIO_PASSWORD
+    volumes:
+      - /mnt/minio:/data:rw
+     # - /etc/letsencrypt/:/etc/minio/certs
+     # - ./conf/minio/certs:/etc/minio/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - company-network
+    restart: always
+
+  frontend-application:
+    container_name: frontend-application
+    image: docker-registry.example.com/company/frontend-application:master-v0.1
+    ports:
+      - 80:80
+    volumes:
+      - /srv/company/conf/frontend-application/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - company-network
+    restart: always
+
+
+  emailbroker:
+    image: docker-registry.example.com/company/emailbroker:master-v0.1
+    hostname: emailbroker
+    container_name: emailbroker
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      MAIL_CLIENT__HOST: smtp.example.com
+      MAIL_CLIENT__PORT: 465
+      MAIL_CLIENT__USE_SSL: true
+      MAIL_CLIENT__LOGIN: prod@example.com
+      MAIL_CLIENT__PASSWORD: ***
+      EMAIL__NAME: Company
+      EMAIL__ADDRESS: prod@example.com
+    volumes:
+      - /srv/company/conf/emailbroker/appsettings.json:/app/appsettings.json:ro
+    ports:
+      - 4009:8080
+    networks:
+      - company-network
+    restart: always
+
+  facade:
+    container_name: facade
+    image: docker-registry.example.com/company/facade:master-v0.1
+    ports:
+      - 4006:8080
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      CLIENTS__PROJECT_MANAGER__URL: http://projectmanager:8080
+      CLIENTS__FILE_GENERATOR__URL: http://filegenerator:8080
+      CLIENTS__FILE_MANAGER__URL: http://filemanager:8080
+      CLIENTS__GIT_MANAGER__URL: http://gitmanager:8080
+      CLIENTS__USER_PROFILE__URL: http://userprofile:8080
+      CLIENTS__EMAIL_BROKER__URL: http://emailbroker:8080
+      CLIENTS__EMAIL_BROKER__EMAIL_FOR_HELP_MESSAGE__0: support@example.com
+      CLIENTS__EMAIL_BROKER__EMAIL_FOR_HELP_MESSAGE__1: support@example.com
+      CLIENTS__FILE_MANAGER__TEMP_BUCKET_NAME: company-temp-prod
+      CLIENTS__FILE_MANAGER__RESULTS_BUCKET_NAME: company-results-prod
+      CLIENTS__FILE_MANAGER__PROJECTS_BUCKET_NAME: company-projects-prod
+    networks:
+      - company-network
+    restart: always
+
+  gitmanager:
+    container_name: gitmanager
+    image: docker-registry.example.com/company/gitmanager:master-v0.1
+    ports:
+      - 4007:8080
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      KESTREL__REQUEST__MAX_BODY_SIZE: 105000000
+      CLIENT__FILE_MANAGER__URI: http://filemanager:8080
+      CLIENT__FILE_MANAGER__PROJECTS_BUCKET_NAME: company-projects-prod
+    restart: always
+    networks:
+      - company-network
+
+
+  userprofile:
+    container_name: userprofile
+    image: docker-registry.example.com/company/userprofile:master-v0.1
+    ports:
+      - 4002:8080
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      POSTGRES_PASSWORD: CHANGE_ME_POSTGRES_PASSWORD
+      POSTGRES_DB: UserProfiles
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: postgres
+    restart: always
+    networks:
+      - company-network
+
+  symbol-recognizer:
+    container_name: symbol-recognizer
+    image: docker-registry.example.com/company/symbolrecognizer:master-v0.1
+    ports:
+      - 8000:8000
+    environment:
+      FILE_MANAGER_BASE_URL: http://filemanager:8080
+    restart: always
+    networks:
+      - company-network
+
+
+  filemanager:
+    container_name: filemanager
+    image: docker-registry.example.com/company/filemanager:master-v0.1
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      MINIO__PROTOCOL: http
+      MINIO__ADDRESS: 10.10.10.43:9000
+      MINIO__ACCESS_KEY: admin
+      MINIO__SECRET_KEY: CHANGE_ME_MINIO_PASSWORD
+      FILE__MAX_SIZE: 105000000
+      FILE__TIME_EXPIRATION_URI_MILLISECONDS: 600000
+      FILE__TIME_EXPIRATION_MILLISECONDS: 600000
+    ports:
+      - 4004:8080
+    networks:
+      - company-network
+    restart: always
+
+  projectmanager:
+    container_name: projectmanager
+    image: docker-registry.example.com/company/projectmanager:master-v0.1
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      PG__HOST: postgres
+      PG__PORT: 5432
+      PG__DATABASE: ProjectManagerService
+      PG__USERNAME: postgres
+      PG__PASSWORD: CHANGE_ME_POSTGRES_PASSWORD
+    ports:
+      - 4001:8080
+    networks:
+      - company-network
+    restart: always
+
+  filegenerator:
+    container_name: filegenerator
+    privileged: true
+    image: docker-registry.example.com/company/filegenerator:master-v0.1
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      KESTREL__REQUEST__MAX_BODY_SIZE: 105000000
+      CLIENT__PROJECT_MANAGER__URI: http://projectmanager:8080
+      CLIENT__FILE_MANAGER__URI: http://filemanager:8080
+      CLIENT__GIT_MANAGER__URI: http://gitmanager:8080
+    ports:
+      - 4003:8080
+    networks:
+      - company-network
+    restart: always
+    volumes:
+      - /usr/local/texlive:/usr/local/texlive
+#      - /usr/share/texlive:/usr/share/texlive:ro
+#      - /var/lib/texmf:/var/lib/texmf:ro
+#      - /usr/share/perl/5.36.0/Pod/Usage.pm:/usr/share/perl/5.36/Pod/Usage.pm:ro
+#      - texlive-cache:/root/.texlive2025
+#  texlive:
+#    container_name: texlive
+#    image: texlive/texlive:TL2024-historic
+#    command: sleep infinity
+#    volumes:
+#      - texlive-2024:/texlive-volume
+#    command: >
+#      sh -c "cp -r /usr/local/texlive/* /texlive-volume/"
+#    restart: always
+
+
+  pg:
+    image: postgres:15.4
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: CHANGE_ME_POSTGRES_PASSWORD
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: always
+    networks:
+      - company-network
+
+  gateway:
+    container_name: gateway
+    image: docker-registry.example.com/company/gateway:master-v0.1
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      CLIENTS__PROFILE_SERVICE_URL: http://userprofile:8080
+      CLIENTS__EMAIL_BROKER_URL: http://emailbroker:8080
+      CLIENTS__PROJECT_MANAGER_URL: http://projectmanager:8080
+      CLIENTS__BASE_URL: http://frontend-application:80
+      CLIENTS__FACADE_URL: http://facade:8080
+      CLIENTS__SYMBOL_RECOGNIZER_URL: http://symbol-recognizer:8000
+      IP__BLOCK_TIME: 60000
+      IP__REQUESTS_NUMBERS: 200
+      POSTGRES__PASSWORD: CHANGE_ME_POSTGRES_PASSWORD
+      POSTGRES__DATABASE: AuthService
+      POSTGRES__HOST: postgres
+      POSTGRES__PORT: 5432
+      POSTGRES__USERNAME: postgres
+      IS__REFRESH_TOKEN_LIFETIME: 86400
+      IS__CONFIRM_EMAIL_TOKEN_LIFETIME: 1000
+      IS__ACCESS_TOKEN_LIFETIME: 1000
+      IS__CLIENT_ID: 0000-0000-0000-0000
+      IS__CLIENT_SECRET: change-me-client-secret
+      MAX_FILE_SIZE: 1073741824
+      USER_TIME_EXPIRATION: 1000
+    ports:
+      - "4005:8080"
+    restart: always
+    networks:
+      - company-network
+#    volumes:
+#      - ./conf/auth/appsettings.json:/app/appsettings.json:ro
+
+
+  colab-edit-service:
+    container_name: colabeditalg-new
+    image: docker-registry.example.com/company/collaborativeeditingservice:master-v0.1
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      KESTREL__REQUEST__MAX_BODY_SIZE: 105000000
+      CLIENT__GIT_MANAGER__URI: http://gitmanager:8080
+    ports:
+      - "4008:8080"
+    restart: always
+    networks:
+      - company-network
+
+
+networks:
+  company-network:
+    driver: bridge
+
+
+volumes:
+    texlive-2024:
+    pgdata: {}
+    pgadmin: {}
+    convergence-omnibus: {}

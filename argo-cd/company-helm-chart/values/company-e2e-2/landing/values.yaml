@@ -1,0 +1,45 @@
+deploymentVersion: "1"
+replicaCount: 1
+imagePullPolicy: Always
+image:
+  repository: docker-registry.example.com/company-land/landing-pre-order
+  tag: develop-86d85277
+  name: landing
+  pullPolicy: IfNotPresent
+containerPort: 80
+environment: company-e2e-2
+serviceName: landing
+useNginxConfig: true
+service:
+  enabled: true
+  port: 80
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "64Mi"
+  limits:
+    cpu: "200m"
+    memory: "256Mi"
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 80
+  initialDelaySeconds: 5
+  periodSeconds: 5
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 80
+  initialDelaySeconds: 15
+  periodSeconds: 15
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app: landing

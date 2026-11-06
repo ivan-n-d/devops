@@ -1,0 +1,65 @@
+skipDefaultResources: true
+
+developerRBAC:
+  enabled: false
+
+namespacePolicy:
+  enabled: true
+  quota:
+    requests:
+      cpu: "7"
+      memory: 10Gi
+    limits:
+      cpu: "17"
+      memory: 26Gi
+    pods: "40"
+    persistentvolumeclaims: "2"
+
+  limitRange:
+    enabled: true
+    default:
+      cpu: 500m
+      memory: 512Mi
+    defaultRequest:
+      cpu: 50m
+      memory: 64Mi
+    max:
+      cpu: "4"
+      memory: 6Gi
+
+networkPolicy:
+  enabled: true
+  defaultDenyEgress: true
+
+  allowDns: true
+  allowNamespaceInternal: true
+  allowTraefikIngress: true
+  nodeCidr: 10.10.20.0/24
+
+  allowExternal:
+    - cidr: 10.10.20.10/32       # prod master: postgres :5432, minio :9000 (docker)
+      ports: [5432, 9000]
+    - cidr: 203.0.113.20/32       # smtp.example.com
+      ports: [465]
+    - cidr: 198.51.100.10/32     # mail-01.example.com (свой почтовый сервер, публичный IP)
+      ports: [465]
+    - cidr: 104.18.20.0/23        # crl/ocsp/secure.globalsign.com
+      ports: [80]
+    - cidr: 8.47.69.0/32          # lencr.org CRL (Let's Encrypt)
+      ports: [80]
+    - cidr: 8.6.112.0/32          # lencr.org CRL (Let's Encrypt)
+      ports: [80]
+    - cidr: 2.16.0.0/13           # Akamai CDN (lencr.org CRL, любые эджи)
+      ports: [80]
+    - cidr: 23.0.0.0/12           # Akamai CDN (lencr.org CRL, любые эджи)
+      ports: [80]
+    - cidr: 80.239.150.0/24       # Akamai edge (Telia POP)
+      ports: [80]
+    - cidr: 146.75.0.0/16         # crl.globalsign.com GeoDNS (Fastly)
+      ports: [80]
+    - cidr: 192.0.80.242/31       # gravatar.com (аватары в commit-detail)
+      ports: [80, 443]
+    - cidr: 10.10.20.2/32        # prod worker (нода)
+    - cidr: 10.10.20.10/32      # prod master (нода)
+
+  allowExternalAll: false

@@ -1,0 +1,11 @@
+services:
+  latex-symbol-recognizer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: symbol-recognizer
+    ports:
+      - "8000:8000"
+    environment:
+      FILE_MANAGER_BASE_URL: "http://file-manager:5000"
+    restart: unless-stopped

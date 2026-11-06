@@ -1,0 +1,19 @@
+route:
+  routes:
+    - receiver: "mattermost-security"
+      matchers:
+        - severity="security"
+      group_wait: 10s
+      repeat_interval: 15m
+
+receivers:
+- name: "mattermost-security"
+  slack_configs:
+    - api_url: 'http://10.10.10.112:8065/hooks/__SEC_WEBHOOK_ID__'
+      send_resolved: true
+      username: "Alertmanager"
+      icon_emoji: ":rotating_light:"
+      title: '{{ .CommonLabels.alertname }} — {{ .Status | toUpper }} (SECURITY)'
+      text: '{{ range .Alerts }}*{{ .Labels.severity | toUpper }}* `{{ .Labels.instance }}` {{ .Annotations.summary }}
+{{ .Annotations.description }}
+{{ end }}'

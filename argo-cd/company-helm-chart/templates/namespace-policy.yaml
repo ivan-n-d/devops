@@ -1,0 +1,75 @@
+{{/*
+ResourceQuota и LimitRange.
+Включение в values/<env>/namespace-policy/values.yaml:
+
+    skipDefaultResources: true
+    namespacePolicy:
+      enabled: true
+      quota:
+        requests: { cpu: "4",  memory: 6Gi }
+        limits:   { cpu: "12", memory: 14Gi }
+        pods: "40"
+        persistentvolumeclaims: "2"
+      limitRange:
+        enabled: true
+*/}}
+{{- if and .Values.namespacePolicy .Values.namespacePolicy.enabled }}
+{{- $np := .Values.namespacePolicy }}
+{{- $q := $np.quota | default dict }}
+{{- $qr := $q.requests | default dict }}
+{{- $ql := $q.limits | default dict }}
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: {{ .Release.Namespace }}-quota
+  labels:
+    app.kubernetes.io/component: namespace-policy
+    app.kubernetes.io/managed-by: helm
+  annotations:
+    example.com/description: "Граница ресурсов стенда. Заменяет nodeSelector."
+spec:
+  hard:
+    {{- with $qr.cpu }}
+    requests.cpu: {{ . | quote }}
+    {{- end }}
+    {{- with $qr.memory }}
+    requests.memory: {{ . | quote }}
+    {{- end }}
+    {{- with $ql.cpu }}
+    limits.cpu: {{ . | quote }}
+    {{- end }}
+    {{- with $ql.memory }}
+    limits.memory: {{ . | quote }}
+    {{- end }}
+    {{- with $q.pods }}
+    pods: {{ . | quote }}
+    {{- end }}
+    {{- with $q.persistentvolumeclaims }}
+    persistentvolumeclaims: {{ . | quote }}
+    {{- end }}
+{{- if and $np.limitRange $np.limitRange.enabled }}
+{{- $lr := $np.limitRange }}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: {{ .Release.Namespace }}-limits
+  labels:
+    app.kubernetes.io/component: namespace-policy
+    app.kubernetes.io/managed-by: helm
+  annotations:
+    example.com/description: "Дефолтные requests/limits для подов без явных resources. Обязателен при ResourceQuota по limits.*"
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: {{ (($lr.default | default dict).cpu) | default "500m" | quote }}
+        memory: {{ (($lr.default | default dict).memory) | default "512Mi" | quote }}
+      defaultRequest:
+        cpu: {{ (($lr.defaultRequest | default dict).cpu) | default "50m" | quote }}
+        memory: {{ (($lr.defaultRequest | default dict).memory) | default "64Mi" | quote }}
+      max:
+        cpu: {{ (($lr.max | default dict).cpu) | default "4" | quote }}
+        memory: {{ (($lr.max | default dict).memory) | default "6Gi" | quote }}
+{{- end }}
+{{- end }}
